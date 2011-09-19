@@ -197,6 +197,7 @@ extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size)
 extern void __iomem *ioremap_cache(resource_size_t offset, unsigned long size);
 extern void __iomem *ioremap_prot(resource_size_t offset, unsigned long size,
 				unsigned long prot_val);
+extern void __iomem *ioremap_mpbt(resource_size_t offset, unsigned long size);
 
 /*
  * The default ioremap() behavior is non-cached:

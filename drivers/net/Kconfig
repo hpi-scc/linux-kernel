@@ -2044,6 +2044,51 @@ menuconfig NETDEV_1000
 
 if NETDEV_1000
 
+choice
+	prompt "SCC Message Buffer Driver"
+	default SCCMB
+	depends on SCCSYS && NET
+	---help---
+	  Select which implementation of the message buffer driver is used.
+
+config SCCMB
+	bool "Original"
+	---help---
+	  Default SCC driver for the on-die network via the message
+	  buffers.
+
+config SCCMBX
+	bool "Extended"
+	---help---
+	  Extended message buffer driver that provides a side-channel for
+	  kernel components.
+
+endchoice
+
+config SCCMBX_DUMP_NONNET_PACKETS
+	bool "Enable packet tracing for on-die non-NET packets"
+	default n
+	depends on SCCMBX
+
+config SCCPC
+	tristate "SCC-HostPC NIC"
+	default n
+	depends on SCCSYS && NET
+	---help---
+	  SCC driver for the MCPC network via the System Interface FPGA.
+
+config SCCPC_DUMP_PACKETS
+	bool "Enable packet tracing for MCPC network"
+	default n
+	depends on SCCPC
+
+config SCCEMAC
+	tristate "SCC EMAC NIC"
+	default n
+	depends on SCCSYS && NET
+	---help---
+	  SCC driver for the off-die network via Ethernet ports.
+
 config ACENIC
 	tristate "Alteon AceNIC/3Com 3C985/NetGear GA620 Gigabit support"
 	depends on PCI

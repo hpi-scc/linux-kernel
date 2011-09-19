@@ -71,6 +71,7 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
 	pgprot_t prot;
 	int retval;
 	void __iomem *ret_addr;
+	int mpbt_flag = (prot_val & _PAGE_PSE) != 0;
 
 	/* Don't allow wraparound or zero size */
 	last_addr = phys_addr + size - 1;
@@ -150,6 +151,11 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
 	case _PAGE_CACHE_WB:
 		prot = PAGE_KERNEL_IO;
 		break;
+	}
+
+	/* SCC: set the MPBT flag if it has been requested before */
+	if (mpbt_flag) {
+		prot = __pgprot(pgprot_val(prot) | _PAGE_PSE);
 	}
 
 	/*
@@ -249,6 +255,13 @@ void __iomem *ioremap_prot(resource_size_t phys_addr, unsigned long size,
 				__builtin_return_address(0));
 }
 EXPORT_SYMBOL(ioremap_prot);
+
+void __iomem *ioremap_mpbt(resource_size_t phys_addr, unsigned long size)
+{
+	return __ioremap_caller(phys_addr, size, _PAGE_PSE | _PAGE_CACHE_WC,
+				__builtin_return_address(0));
+}
+EXPORT_SYMBOL(ioremap_mpbt);
 
 /**
  * iounmap - Free a IO remapping

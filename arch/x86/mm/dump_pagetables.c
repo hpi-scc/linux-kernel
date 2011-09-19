@@ -124,6 +124,14 @@ static void printk_prot(struct seq_file *m, pgprot_t prot, int level)
 				seq_printf(m, "PSE ");
 			else
 				seq_printf(m, "    ");
+#ifdef CONFIG_X86_SCC
+		} else if ((level == 4) && ((read_cr4() & (X86_CR4_PSE |
+			X86_CR4_MPE)) == X86_CR4_MPE))  {
+			if (pr & _PAGE_PMB)
+				seq_printf(m, "PMB ");
+			else
+				seq_printf(m, "    ");
+#endif
 		} else {
 			if (pr & _PAGE_PAT)
 				seq_printf(m, "pat ");

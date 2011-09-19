@@ -630,6 +630,7 @@ calibrate_by_pmtimer(long deltapm, long *delta, long *deltatsc)
 
 static int __init calibrate_APIC_clock(void)
 {
+#ifndef CONFIG_X86_SCC
 	struct clock_event_device *levt = &__get_cpu_var(lapic_events);
 	void (*real_handler)(struct clock_event_device *dev);
 	unsigned long deltaj;
@@ -746,7 +747,18 @@ static int __init calibrate_APIC_clock(void)
 		pr_warning("APIC timer disabled due to verification failure\n");
 			return -1;
 	}
+#else // CONFIG_X86_SCC
+	/*
+	 * No calibration possible since it is based on another clock we don't
+	 * have. On the SCC, the LAPIC timer *is* the primary clock source, so
+	 * we need to fake a calibration result by referring to the configured
+	 * bus clock.
+         */
 
+	calibration_result = CONFIG_SCC_BUSCLOCK / HZ;
+	printk("SCC: Setting APIC timer based on configured Bus clock of %u.%04u MHz.\n",
+		calibration_result/(1000000/HZ), calibration_result%(1000000/HZ));
+#endif
 	return 0;
 }
 
@@ -1556,9 +1568,17 @@ static int __init apic_verify(void)
 	mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
 
 	/* The BIOS may have set up the APIC at some other address */
-	rdmsr(MSR_IA32_APICBASE, l, h);
-	if (l & MSR_IA32_APICBASE_ENABLE)
-		mp_lapic_addr = l & MSR_IA32_APICBASE_BASE;
+	if (boot_cpu_data.x86 != 5) {
+		/*
+		 * Only P6 and later cores implement the MSR_IA32_APICBASE. For
+		 * all previous ones, we need to rely on the APIC residing at
+		 * its default address.
+		 */
+
+		rdmsr(MSR_IA32_APICBASE, l, h);
+		if (l & MSR_IA32_APICBASE_ENABLE)
+			mp_lapic_addr = l & MSR_IA32_APICBASE_BASE;
+	}
 
 	pr_info("Found and enabled local APIC!\n");
 	return 0;

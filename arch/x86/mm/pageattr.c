@@ -998,6 +998,37 @@ out_err:
 }
 EXPORT_SYMBOL(set_memory_uc);
 
+int set_memory_mpbt(unsigned long start, int numpages)
+{
+	unsigned int i, level;
+	unsigned long addr;
+
+	BUG_ON(irqs_disabled());
+	WARN_ON(PAGE_ALIGN(start) != start);
+
+	on_each_cpu(__cpa_flush_range, NULL, 1);
+
+	for (i = 0, addr = start; i < numpages; i++, addr += PAGE_SIZE) {
+		pte_t *pte = lookup_address(addr, &level);
+
+		if (pte) {
+			pte_mkhuge(*pte);
+		}
+	}
+	return 0;
+	//return change_page_attr_set(&start, numpages, __pgprot(_PAGE_PSE), 0);
+}
+EXPORT_SYMBOL(set_memory_mpbt);
+
+#ifdef CONFIG_X86_SCC
+int set_memory_wt_mpbt(unsigned long addr, int numpages)
+{
+	return change_page_attr_set(&addr, numpages,
+				    __pgprot(_PAGE_CACHE_WC | _PAGE_PMB), 0);
+}
+EXPORT_SYMBOL(set_memory_wt_mpbt);
+#endif
+
 int _set_memory_array(unsigned long *addr, int addrinarray,
 		unsigned long new_type)
 {
@@ -1171,6 +1202,14 @@ int set_pages_uc(struct page *page, int numpages)
 	return set_memory_uc(addr, numpages);
 }
 EXPORT_SYMBOL(set_pages_uc);
+
+int set_pages_mpbt(struct page *page, int numpages)
+{
+	unsigned long addr = (unsigned long)page_address(page);
+
+	return set_memory_mpbt(addr, numpages);
+}
+EXPORT_SYMBOL(set_pages_mpbt);
 
 static int _set_pages_array(struct page **pages, int addrinarray,
 		unsigned long new_type)

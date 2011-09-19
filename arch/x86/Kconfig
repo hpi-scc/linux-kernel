@@ -53,6 +53,7 @@ config X86
 	select HAVE_KERNEL_LZMA
 	select HAVE_KERNEL_XZ
 	select HAVE_KERNEL_LZO
+	select HAVE_KERNEL_NONE
 	select HAVE_HW_BREAKPOINT
 	select HAVE_MIXED_BREAKPOINTS_REGS
 	select PERF_EVENTS
@@ -409,6 +410,22 @@ config X86_MRST
 	  Unlike standard x86 PCs, Moorestown does not have many legacy devices
 	  nor standard legacy replacement devices/features. e.g. Moorestown does
 	  not contain i8259, i8254, HPET, legacy BIOS, most of the io ports.
+
+config X86_SCC
+	bool "Copperridge/RockyLake platform"
+	 depends on X86_32
+	 depends on X86_EXTENDED_PLATFORM
+	---help---
+	  This enables certain tweaks for running the kernel on SCC cores.
+
+config SCC_BUSCLOCK
+	int "Frequency of SCC FSB clock in Hz"
+	default 533000000
+	depends on X86_SCC
+	range 1000000 2000000000
+	---help---
+	  SCC core clock frequency used to calculate configuration for LAPIC
+	  timer setup
 
 config X86_RDC321X
 	bool "RDC R-321x SoC"

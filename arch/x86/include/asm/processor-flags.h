@@ -58,6 +58,9 @@
 #define X86_CR4_PCE	0x00000100 /* enable performance counters at ipl 3 */
 #define X86_CR4_OSFXSR	0x00000200 /* enable fast FPU save and restore */
 #define X86_CR4_OSXMMEXCPT 0x00000400 /* enable unmasked SSE exceptions */
+#ifdef CONFIG_X86_SCC
+#define X86_CR4_MPE	0x00000800 /* SCC: enable MPBT caching */
+#endif
 #define X86_CR4_VMXE	0x00002000 /* enable VMX virtualization */
 #define X86_CR4_OSXSAVE 0x00040000 /* enable xsave and xrestore */
 

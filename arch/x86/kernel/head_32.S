@@ -259,6 +259,8 @@ subarch_entries:
 	.long lguest_entry		/* lguest hypervisor */
 	.long xen_entry			/* Xen hypervisor */
 	.long default_entry		/* Moorestown MID */
+	.long default_entry		/* CE4100 */
+	.long default_entry		/* SCC */
 num_subarch_entries = (. - subarch_entries) / 4
 .previous
 #else

@@ -6,6 +6,11 @@ obj-$(CONFIG_MII) += mii.o
 obj-$(CONFIG_MDIO) += mdio.o
 obj-$(CONFIG_PHYLIB) += phy/
 
+obj-$(CONFIG_SCCMB)		+= sccmb.o
+obj-$(CONFIG_SCCMBX)		+= sccmbx.o
+obj-$(CONFIG_SCCPC) 		+= sccpc.o
+obj-$(CONFIG_SCCEMAC)		+= sccemac.o
+
 obj-$(CONFIG_TI_DAVINCI_EMAC) += davinci_emac.o
 obj-$(CONFIG_TI_DAVINCI_MDIO) += davinci_mdio.o
 obj-$(CONFIG_TI_DAVINCI_CPDMA) += davinci_cpdma.o

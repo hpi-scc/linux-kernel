@@ -145,6 +145,12 @@ config HUGETLBFS
 
 	  If unsure, say N.
 
+config POPSHM
+	bool "POPSHM support"
+	depends on HUGETLBFS
+	help
+		POPSHM feature for Intel's Single Chip Cloud Computer.
+
 config HUGETLB_PAGE
 	def_bool HUGETLBFS
 

@@ -15,6 +15,9 @@
 #define _PAGE_BIT_DIRTY		6	/* was written to (raised by CPU) */
 #define _PAGE_BIT_PSE		7	/* 4 MB (or 2MB) page */
 #define _PAGE_BIT_PAT		7	/* on 4KB pages */
+#ifdef CONFIG_X86_SCC
+#define _PAGE_BIT_PMB		7	/* on 4KB pages if CR4 has (!PSE && MBE) */
+#endif
 #define _PAGE_BIT_GLOBAL	8	/* Global TLB entry PPro+ */
 #define _PAGE_BIT_UNUSED1	9	/* available for programmer */
 #define _PAGE_BIT_IOMAP		10	/* flag used to indicate IO mapping */
@@ -39,6 +42,9 @@
 #define _PAGE_ACCESSED	(_AT(pteval_t, 1) << _PAGE_BIT_ACCESSED)
 #define _PAGE_DIRTY	(_AT(pteval_t, 1) << _PAGE_BIT_DIRTY)
 #define _PAGE_PSE	(_AT(pteval_t, 1) << _PAGE_BIT_PSE)
+#ifdef CONFIG_X86_SCC
+#define _PAGE_PMB	(_AT(pteval_t, 1) << _PAGE_BIT_PMB)
+#endif
 #define _PAGE_GLOBAL	(_AT(pteval_t, 1) << _PAGE_BIT_GLOBAL)
 #define _PAGE_UNUSED1	(_AT(pteval_t, 1) << _PAGE_BIT_UNUSED1)
 #define _PAGE_IOMAP	(_AT(pteval_t, 1) << _PAGE_BIT_IOMAP)

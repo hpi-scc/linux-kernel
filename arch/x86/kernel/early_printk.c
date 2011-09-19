@@ -169,6 +169,37 @@ static struct console early_serial_console = {
 	.index =	-1,
 };
 
+#ifdef CONFIG_X86_SCC
+spinlock_t scclock;
+
+static int scc_putc(unsigned char ch)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&scclock, flags);
+	outb(ch, 0x2f8);
+	spin_unlock_irqrestore(&scclock, flags);
+	return 0;
+}
+
+static void scc_write(struct console *con, const char *s, unsigned n)
+{
+	while (*s && n-- > 0) {
+		if (*s == '\n')
+			scc_putc('\r');
+		scc_putc(*s);
+		s++;
+	}
+}
+
+static struct console scc_console = {
+	.name =		"scccon",
+	.write =	scc_write,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
+};
+#endif
+
 /* Direct interface for emergencies */
 static struct console *early_console = &early_vga_console;
 static int __initdata early_console_initialized;
@@ -250,6 +281,10 @@ static int __init setup_early_printk(char *buf)
 			hsu_early_console_init();
 			early_console_register(&early_hsu_console, keep);
 		}
+#endif
+#ifdef CONFIG_X86_SCC
+		if (!strncmp(buf, "scc", 3))
+			early_console_register(&scc_console, keep);
 #endif
 		buf++;
 	}

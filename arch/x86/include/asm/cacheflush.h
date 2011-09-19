@@ -97,6 +97,9 @@ int _set_memory_wb(unsigned long addr, int numpages);
 int set_memory_uc(unsigned long addr, int numpages);
 int set_memory_wc(unsigned long addr, int numpages);
 int set_memory_wb(unsigned long addr, int numpages);
+#ifdef CONFIG_X86_SCC
+int set_memory_wt_mpbt(unsigned long addr, int numpages);
+#endif
 int set_memory_x(unsigned long addr, int numpages);
 int set_memory_nx(unsigned long addr, int numpages);
 int set_memory_ro(unsigned long addr, int numpages);
@@ -133,6 +136,7 @@ int set_pages_array_wb(struct page **pages, int addrinarray);
  */
 
 int set_pages_uc(struct page *page, int numpages);
+int set_pages_mpbt(struct page *page, int numpages);
 int set_pages_wb(struct page *page, int numpages);
 int set_pages_x(struct page *page, int numpages);
 int set_pages_nx(struct page *page, int numpages);

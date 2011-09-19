@@ -1,6 +1,14 @@
 /*
  * Generic hugetlb support.
  * (C) William Irwin, April 2004
+ *
+ * April 2011:
+ * Added POPSHM feature for Intel's Single Chip Cloud Computer.
+ *
+ * Isaias Alberto Compres Urenai(isaias.a.compres.urena@intel.com)
+ *
+ * Portions copyright 2011 Intel Corporation.
+ *
  */
 #include <linux/list.h>
 #include <linux/init.h>
@@ -29,6 +37,46 @@
 #include <linux/hugetlb.h>
 #include <linux/node.h>
 #include "internal.h"
+
+#ifdef CONFIG_POPSHM
+// legacy shared memory
+#define SHM_X0_Y0 0x80000000
+#define SHM_X5_Y0 0x81000000
+#define SHM_X0_Y2 0x82000000
+#define SHM_X5_Y2 0x83000000
+#define SHM_ADDR  SHM_X0_Y0
+// CRB of this core
+#define CRB_OWN   0xf8000000
+// LUTs
+#define LUT0     0x00800
+#define LUT1     0x01000
+// Tile ID
+#define MYTILEID 0x100
+
+#define POPSHM_PAGEDATA_BASE (SHM_X5_Y0 + 0x0800)
+#define POPSHM_PAGEDATA_SLOTSIZE 8
+#define POPSHM_PAGEDATA_LOCALSLOT (POPSHM_PAGEDATA_BASE + \
+		    (local_core_id * POPSHM_PAGEDATA_SLOTSIZE))
+#define POPSHM_LUT_BASE (CRB_OWN + (local_core_z?LUT1:LUT0))
+#define POPSHM_LUT_SLOTSIZE 8
+#define POPSHM_LUT_OFFSET ((popshm_base_address >> POPSHMPAGE_SHIFT)\
+		    * POPSHM_LUT_SLOTSIZE)
+
+#define POPSHMPAGE_MAXCOUNT  5
+#define POPSHMPAGE_SHIFT  24
+#define POPSHMPAGE_SIZE ((1UL) << POPSHMPAGE_SHIFT)
+#define POPSHMPAGE_MASK (~(POPSHMPAGE_SIZE - 1))
+
+static void free_all_popshm(struct hstate *h, nodemask_t *nodes_allowed);
+static void publish_popshm_data(struct hstate *h);
+static void try_to_free_low(struct hstate *h, unsigned long count,
+						nodemask_t *nodes_allowed);
+
+static unsigned int popshm_base_address;
+static int local_core_z, local_core_id;
+#endif
+
+#define persistent_huge_pages(h) (h->nr_huge_pages - h->surplus_huge_pages)
 
 const unsigned long hugetlb_zero = 0, hugetlb_infinity = ~0UL;
 static gfp_t htlb_alloc_mask = GFP_HIGHUSER;
@@ -659,6 +707,38 @@ static int hstate_next_node_to_alloc(struct hstate *h,
 	return nid;
 }
 
+#ifdef CONFIG_POPSHM
+static int alloc_fresh_huge_page(struct hstate *h, nodemask_t *nodes_allowed,
+		unsigned int *page_address)
+{
+	struct page *page;
+	int start_nid;
+	int next_nid;
+	int ret = 0;
+
+	start_nid = hstate_next_node_to_alloc(h, nodes_allowed);
+	next_nid = start_nid;
+
+	do {
+		page = alloc_fresh_huge_page_node(h, next_nid);
+		if (page) {
+			// privide physical address of the page
+			*page_address = page_to_phys(page);
+			printk(KERN_WARNING "fresh page address: %x\n", *page_address);
+			ret = 1;
+			break;
+		}
+		next_nid = hstate_next_node_to_alloc(h, nodes_allowed);
+	} while (next_nid != start_nid);
+
+	if (ret)
+		count_vm_event(HTLB_BUDDY_PGALLOC);
+	else
+		count_vm_event(HTLB_BUDDY_PGALLOC_FAIL);
+
+	return ret;
+}
+#else
 static int alloc_fresh_huge_page(struct hstate *h, nodemask_t *nodes_allowed)
 {
 	struct page *page;
@@ -685,6 +765,7 @@ static int alloc_fresh_huge_page(struct hstate *h, nodemask_t *nodes_allowed)
 
 	return ret;
 }
+#endif
 
 /*
  * helper for free_pool_huge_page() - return the previously saved
@@ -1114,6 +1195,129 @@ static void __init gather_bootmem_prealloc(void)
 	}
 }
 
+
+#ifdef CONFIG_POPSHM
+static void free_all_popshm(struct hstate *h, nodemask_t *nodes_allowed){
+	int min_count;
+
+	min_count = 0;
+
+	spin_lock(&hugetlb_lock);
+	try_to_free_low(h, min_count, nodes_allowed);
+	while (min_count < persistent_huge_pages(h)) {
+		if (!free_pool_huge_page(h, nodes_allowed, 0))
+			break;
+	}
+	spin_unlock(&hugetlb_lock);
+}
+
+static void publish_popshm_data(struct hstate *h) {
+	void *lut_address, *popshm_table_address;
+	unsigned int data;
+
+	lut_address = ioremap_nocache((POPSHM_LUT_BASE +
+				POPSHM_LUT_OFFSET), sizeof(int));
+
+	popshm_table_address = ioremap_nocache(POPSHM_PAGEDATA_LOCALSLOT,
+			POPSHM_PAGEDATA_SLOTSIZE);
+
+	if (lut_address && popshm_table_address) {
+		data = readl(lut_address);
+		writel(data, popshm_table_address);
+		data = h->nr_huge_pages/4;
+		data += popshm_base_address;
+		writel(data, popshm_table_address + sizeof(int));
+
+		iounmap(lut_address);
+		iounmap(popshm_table_address);
+
+		printk(KERN_WARNING "local popshm page data published\n");
+	}
+}
+
+static void __init hugetlb_hstate_alloc_pages(struct hstate *h)
+{
+	unsigned page_address, previous_page_address;
+	int contig_pages, count, current_page_count, i;
+	void *popshm_table_address;
+
+	NODEMASK_ALLOC(nodemask_t, nodes_allowed,
+			GFP_KERNEL | __GFP_NORETRY);
+
+	printk(KERN_WARNING "hugetlb_hstate_alloc_pages with %ld\n", h->max_huge_pages);
+
+	if (h->max_huge_pages <= 0) { // no pages
+		popshm_table_address = ioremap_nocache(POPSHM_PAGEDATA_LOCALSLOT,
+				POPSHM_PAGEDATA_SLOTSIZE);
+
+		if (popshm_table_address) {
+			writel(0x00000000, popshm_table_address);
+			writel(0x00000000, popshm_table_address + sizeof(int));
+			iounmap(popshm_table_address);
+		}
+	} else { // popshm pages requested
+		if(h->max_huge_pages <= POPSHMPAGE_MAXCOUNT){
+			count = h->max_huge_pages * 4;
+		} else {
+			count = POPSHMPAGE_MAXCOUNT * 4;
+		}
+
+		contig_pages = 1;
+		previous_page_address = 0;
+		popshm_base_address = 0;
+
+		while (!popshm_base_address) {
+			if (!alloc_fresh_huge_page(h, &node_states[N_HIGH_MEMORY], &page_address)) {
+				free_all_popshm(h, nodes_allowed);
+				publish_popshm_data(h);
+				h->max_huge_pages = 0;
+				printk(KERN_ERR "Failed to allocater POPSHM pages\n");
+			}
+			if (previous_page_address - page_address == HPAGE_SIZE) {
+				contig_pages++;
+				if ((contig_pages >= count) && !(page_address & (~POPSHMPAGE_MASK))) {
+					popshm_base_address = page_address;
+					printk(KERN_WARNING "popshm base page address: %x\n", popshm_base_address);
+				}
+			} else {
+				contig_pages = 1;
+			}
+
+			previous_page_address = page_address;
+		}
+
+		// free excess pages
+		if (!( init_nodemask_of_mempolicy(nodes_allowed))) {
+			NODEMASK_FREE(nodes_allowed);
+			nodes_allowed = &node_states[N_HIGH_MEMORY];
+		}
+
+		current_page_count = 0;
+		for_each_node_mask(i, *nodes_allowed) {
+			struct page *page, *next;
+			struct list_head *freel = &h->hugepage_freelists[i];
+			list_for_each_entry_safe(page, next, freel, lru) {
+				current_page_count++;
+				if (current_page_count > count){
+					printk(KERN_WARNING "freeing page with address: %x\n", page_to_phys(page));
+					list_del(&page->lru);
+					update_and_free_page(h, page);
+					h->free_huge_pages--;
+					h->free_huge_pages_node[page_to_nid(page)]--;
+				}
+			}
+		}
+
+		if (nodes_allowed != &node_states[N_HIGH_MEMORY])
+			NODEMASK_FREE(nodes_allowed);
+
+		publish_popshm_data(h);
+	}
+
+	printk(KERN_WARNING "hugetlb_hstate_alloc_pages exit %ld\n", h->max_huge_pages);
+
+}
+#else
 static void __init hugetlb_hstate_alloc_pages(struct hstate *h)
 {
 	unsigned long i;
@@ -1128,6 +1332,7 @@ static void __init hugetlb_hstate_alloc_pages(struct hstate *h)
 	}
 	h->max_huge_pages = i;
 }
+#endif
 
 static void __init hugetlb_init_hstates(void)
 {
@@ -1169,6 +1374,7 @@ static void try_to_free_low(struct hstate *h, unsigned long count,
 						nodemask_t *nodes_allowed)
 {
 	int i;
+	printk(KERN_WARNING "try_to_free_low\n");
 
 	if (h->order >= MAX_ORDER)
 		return;
@@ -1247,7 +1453,54 @@ static int adjust_pool_surplus(struct hstate *h, nodemask_t *nodes_allowed,
 	return ret;
 }
 
-#define persistent_huge_pages(h) (h->nr_huge_pages - h->surplus_huge_pages)
+#ifdef CONFIG_POPSHM
+static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
+						nodemask_t *nodes_allowed)
+{
+	unsigned long min_count, ret;
+	unsigned page_address;
+	printk(KERN_WARNING "set_max_huge_pages nr max: %ld; count: %ld;\n", h->max_huge_pages, count);
+
+	if (h->order >= MAX_ORDER)
+		return h->max_huge_pages;
+
+	spin_lock(&hugetlb_lock);
+	while (h->surplus_huge_pages && count > persistent_huge_pages(h)) {
+		if (!adjust_pool_surplus(h, nodes_allowed, -1))
+			break;
+	}
+
+	while (count > persistent_huge_pages(h)) {
+		spin_unlock(&hugetlb_lock);
+
+		ret = alloc_fresh_huge_page(h, nodes_allowed, &page_address);
+		printk(KERN_WARNING "fresh page address: %x\n", page_address);
+		spin_lock(&hugetlb_lock);
+		if (!ret)
+			goto out;
+
+		/* Bail for signals. Probably ctrl-c from user */
+		if (signal_pending(current))
+			goto out;
+	}
+
+	min_count = h->resv_huge_pages + h->nr_huge_pages - h->free_huge_pages;
+	min_count = max(count, min_count);
+	try_to_free_low(h, min_count, nodes_allowed);
+	while (min_count < persistent_huge_pages(h)) {
+		if (!free_pool_huge_page(h, nodes_allowed, 0))
+			break;
+	}
+	while (count < persistent_huge_pages(h)) {
+		if (!adjust_pool_surplus(h, nodes_allowed, 1))
+			break;
+	}
+out:
+	ret = persistent_huge_pages(h);
+	spin_unlock(&hugetlb_lock);
+	return ret;
+}
+#else
 static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
 						nodemask_t *nodes_allowed)
 {
@@ -1321,6 +1574,7 @@ out:
 	spin_unlock(&hugetlb_lock);
 	return ret;
 }
+#endif // !POPSHM
 
 #define HSTATE_ATTR_RO(_name) \
 	static struct kobj_attribute _name##_attr = __ATTR_RO(_name)
@@ -1751,6 +2005,22 @@ module_exit(hugetlb_exit);
 
 static int __init hugetlb_init(void)
 {
+#ifdef CONFIG_POPSHM
+	void* coreinfo_address;
+	int config_register_data, local_core_x, local_core_y;
+
+	coreinfo_address = ioremap_nocache(CRB_OWN + MYTILEID, sizeof(int));
+	if (coreinfo_address) {
+		config_register_data = readl(coreinfo_address);
+		local_core_x = (config_register_data >> 3) & 0x0f;
+		local_core_y = (config_register_data >> 7) & 0x0f;
+		local_core_z = (config_register_data) & 0x07;
+		local_core_id = ((local_core_x + (6 * local_core_y)) * 2) + local_core_z;
+
+		iounmap(coreinfo_address);
+	}
+#endif
+
 	/* Some platform decide whether they support huge pages at boot
 	 * time. On these, such as powerpc, HPAGE_SHIFT is set to 0 when
 	 * there is no such support
@@ -1760,6 +2030,7 @@ static int __init hugetlb_init(void)
 
 	if (!size_to_hstate(default_hstate_size)) {
 		default_hstate_size = HPAGE_SIZE;
+		printk(KERN_WARNING "hugepages size = %lu\n", default_hstate_size );
 		if (!size_to_hstate(default_hstate_size))
 			hugetlb_add_hstate(HUGETLB_PAGE_ORDER);
 	}
@@ -1808,6 +2079,37 @@ void __init hugetlb_add_hstate(unsigned order)
 	parsed_hstate = h;
 }
 
+#ifdef CONFIG_POPSHM
+static int __init hugetlb_nrpages_setup(char *s)
+{
+	unsigned long *mhp;
+	static unsigned long *last_mhp;
+
+	printk(KERN_WARNING "hugetlb_nrpages_setup\n");
+
+	if (!max_hstate)
+		mhp = &default_hstate_max_huge_pages;
+	else
+		mhp = &parsed_hstate->max_huge_pages;
+
+	if (mhp == last_mhp) {
+		printk(KERN_WARNING "popshmpages= specified twice without "
+			"interleaving hugepagesz=, ignoring\n");
+		return 1;
+	}
+
+	if (sscanf(s, "%lu", mhp) <= 0)
+		*mhp = 0;
+
+	if (max_hstate && parsed_hstate->order >= MAX_ORDER)
+		hugetlb_hstate_alloc_pages(parsed_hstate);
+
+	last_mhp = mhp;
+
+	return 1;
+}
+__setup("popshmpages=", hugetlb_nrpages_setup);
+#else
 static int __init hugetlb_nrpages_setup(char *s)
 {
 	unsigned long *mhp;
@@ -1844,6 +2146,7 @@ static int __init hugetlb_nrpages_setup(char *s)
 	return 1;
 }
 __setup("hugepages=", hugetlb_nrpages_setup);
+#endif
 
 static int __init hugetlb_default_setup(char *s)
 {
@@ -1962,6 +2265,17 @@ out:
 void hugetlb_report_meminfo(struct seq_file *m)
 {
 	struct hstate *h = &default_hstate;
+#ifdef CONFIG_POPSHM
+	seq_printf(m,
+			"POPSHM pages:    %5lu\n"
+			"POPSHM page size:    %5lu kB\n"
+			"POPSHM buffer size:  %5lu kB\n"
+			"POPSHM base address: 0x%08x\n",
+			h->nr_huge_pages/4,
+			POPSHMPAGE_SIZE/1024,
+			(HPAGE_SIZE * h->nr_huge_pages )/1024,
+			popshm_base_address);
+#else
 	seq_printf(m,
 			"HugePages_Total:   %5lu\n"
 			"HugePages_Free:    %5lu\n"
@@ -1973,6 +2287,7 @@ void hugetlb_report_meminfo(struct seq_file *m)
 			h->resv_huge_pages,
 			h->surplus_huge_pages,
 			1UL << (huge_page_order(h) + PAGE_SHIFT - 10));
+#endif
 }
 
 int hugetlb_report_node_meminfo(int nid, char *buf)
@@ -2338,12 +2653,14 @@ static int hugetlb_cow(struct mm_struct *mm, struct vm_area_struct *vma,
 			unsigned long address, pte_t *ptep, pte_t pte,
 			struct page *pagecache_page)
 {
-	struct hstate *h = hstate_vma(vma);
+	struct hstate *h;
 	struct page *old_page, *new_page;
 	int avoidcopy;
 	int outside_reserve = 0;
 
+	printk(KERN_WARNING "hugetlb_cow\n");
 	old_page = pte_page(pte);
+	h = hstate_vma(vma);
 
 retry_avoidcopy:
 	/* If no-one else is actually using this page, avoid the copy

@@ -233,6 +233,12 @@ config X86_LONGHAUL
 
 	  If in doubt, say N.
 
+config X86_SCCFREQ
+	tristate "SCC Freq"
+	depends on X86_SCC
+	help
+	  This adds the CPUFreq driver for Single-chip cloud computer.
+
 config X86_E_POWERSAVER
 	tristate "VIA C7 Enhanced PowerSaver (DANGEROUS)"
 	select CPU_FREQ_TABLE

@@ -748,6 +748,13 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 #endif
 	}
 
+#ifdef CONFIG_X86_SCC
+	l3 = 0;
+	l2 = 256;
+	l1i = 16;
+	l1d = 0;
+#endif
+
 	c->x86_cache_size = l3 ? l3 : (l2 ? l2 : (l1i+l1d));
 
 	return l2;

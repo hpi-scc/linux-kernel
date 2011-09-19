@@ -4,6 +4,48 @@
 
 menu "Character devices"
 
+config SCCSYS
+	bool "SCC system driver"
+	depends on X86_SCC
+	default n
+	---help---
+	  SCC system driver. This driver provides access to the
+	  architecture-specific configuration register banks (CRB), and is
+	  also responsible for initializing message-passing buffers and the
+	  MPBT (message-passing buffer type) caching type.
+
+config SCCSYS_RECURSIVE_PID_LOCK
+	bool "Recursive PID locks"
+	default y
+	depends on SCCSYS
+	---help---
+	  Allow acquiring the core-specific test&set registers recursively.
+
+config SCCMEM
+	bool "SCC system memory driver"
+	default n
+	depends on SCCSYS
+	---help---
+	  SCC memory driver. This driver provides the rckncm, rckmpb and
+	  rckdcm devices to applications.
+
+config SCCPERF
+	tristate "SCC performance meter driver"
+	default n
+	depends on SCCSYS
+	---help---
+	  This driver reports the core's CPU utilization to the MCPC via shared
+	  memory. It can be enabled if using the modified cpuutil program is
+	  not desired.
+
+config SCCPROC
+	bool "SCC procfs driver"
+	default n
+	depends on SCCSYS
+	---help---
+	  This driver provides SCC-specific entries in the /proc file
+	  system.
+
 source "drivers/tty/Kconfig"
 
 config DEVKMEM

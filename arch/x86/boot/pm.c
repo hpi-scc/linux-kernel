@@ -103,6 +103,9 @@ static void setup_idt(void)
  */
 void go_to_protected_mode(void)
 {
+#ifdef CONFIG_X86_SCC
+	asm("cli");
+#else
 	/* Hook before leaving real mode, also disables interrupts */
 	realmode_switch_hook();
 
@@ -117,6 +120,7 @@ void go_to_protected_mode(void)
 
 	/* Mask all interrupts in the PIC */
 	mask_all_interrupts();
+#endif
 
 	/* Actual transition to protected mode... */
 	setup_idt();

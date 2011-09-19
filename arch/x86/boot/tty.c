@@ -54,10 +54,16 @@ void __attribute__((section(".inittext"))) putchar(int ch)
 	if (ch == '\n')
 		putchar('\r');	/* \n -> \r\n */
 
+#ifdef CONFIG_X86_SCC
+#ifdef CONFIG_SCC_BOOT_DEBUG
+	outb(ch & 0xFF, 0x2F8);
+#endif
+#else
 	bios_putchar(ch);
 
 	if (early_serial_base != 0)
 		serial_putchar(ch);
+#endif
 }
 
 void __attribute__((section(".inittext"))) puts(const char *str)

@@ -420,8 +420,10 @@ void __cpuinit cpu_detect_cache_sizes(struct cpuinfo_x86 *c)
 		l2size = this_cpu->c_size_cache(c, l2size);
 
 	/* Allow user to override all this if necessary. */
-	if (cachesize_override != -1)
-		l2size = cachesize_override;
+	//if (cachesize_override != -1)
+	//	l2size = cachesize_override;
+	printk(KERN_INFO "Setting l2size\n");
+	l2size = 0x3FC00;
 
 	if (l2size == 0)
 		return;		/* Again, no L2 cache is possible */
