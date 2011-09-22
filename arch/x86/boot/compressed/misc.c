@@ -108,7 +108,7 @@ static void error(char *m);
  * This is set up by the setup-routine at boot-time
  */
 struct boot_params *real_mode;		/* Pointer to real-mode data */
-static int quiet = 0;
+static int quiet;
 static int debug;
 
 void *memset(void *s, int c, size_t n);
@@ -147,10 +147,6 @@ static int lines, cols;
 #include "../../../../lib/decompress_unlzo.c"
 #endif
 
-#ifdef CONFIG_KERNEL_NONE
-#include "../../../../lib/decompress_unlzo.c"
-#endif
-
 static void scroll(void)
 {
 	int i;
@@ -178,14 +174,6 @@ void __putstr(int error, const char *s)
 {
 	int x, y, pos;
 	char c;
-
-#ifdef CONFIG_EARLY_PRINTK_SCC
-	const char *str = s;
-	while (*str) {
-		outb(*str++, 0x2f8);
-	}
-	return;
-#endif
 
 #ifndef CONFIG_X86_VERBOSE_BOOTUP
 	if (!error)
@@ -378,16 +366,10 @@ asmlinkage void decompress_kernel(void *rmode, memptr heap,
 	if ((unsigned long)output != LOAD_PHYSICAL_ADDR)
 		error("Wrong destination address");
 #endif
-	quiet = 0;
 
 	if (!quiet)
 		putstr("\nDecompressing Linux... ");
-#ifndef CONFIG_KERNEL_NONE
 	decompress(input_data, input_len, NULL, NULL, output, NULL, error);
-#else
-	memcpy(output, input_data, input_len);
-#endif
-
 	parse_elf(output);
 	if (!quiet)
 		putstr("done.\nBooting the kernel.\n");

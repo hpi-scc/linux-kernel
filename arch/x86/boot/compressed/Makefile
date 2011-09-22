@@ -23,9 +23,15 @@ LDFLAGS_vmlinux := -T
 
 hostprogs-y	:= mkpiggy
 
+ifeq ($(CONFIG_KERNEL_NONE),y)
+OBJCOPYFLAGS_vmlinux :=
+$(obj)/vmlinux: vmlinux FORCE
+	$(call if_changed,objcopy)
+else
 $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/head_$(BITS).o $(obj)/misc.o $(obj)/string.o $(obj)/cmdline.o $(obj)/early_serial_console.o $(obj)/piggy.o FORCE
 	$(call if_changed,ld)
 	@:
+endif
 
 OBJCOPYFLAGS_vmlinux.bin :=  -R .comment -S
 $(obj)/vmlinux.bin: vmlinux FORCE
@@ -53,15 +59,12 @@ $(obj)/vmlinux.bin.xz: $(vmlinux.bin.all-y) FORCE
 	$(call if_changed,xzkern)
 $(obj)/vmlinux.bin.lzo: $(vmlinux.bin.all-y) FORCE
 	$(call if_changed,lzo)
-$(obj)/vmlinux.bin.none: $(vmlinux.bin.all-y) FORCE
-	cp $(obj)/vmlinux.bin $(obj)/vmlinux.bin.none
 
 suffix-$(CONFIG_KERNEL_GZIP)	:= gz
 suffix-$(CONFIG_KERNEL_BZIP2)	:= bz2
 suffix-$(CONFIG_KERNEL_LZMA)	:= lzma
 suffix-$(CONFIG_KERNEL_XZ)	:= xz
 suffix-$(CONFIG_KERNEL_LZO) 	:= lzo
-suffix-$(CONFIG_KERNEL_NONE) 	:= none
 
 quiet_cmd_mkpiggy = MKPIGGY $@
       cmd_mkpiggy = $(obj)/mkpiggy $< > $@ || ( rm -f $@ ; false )

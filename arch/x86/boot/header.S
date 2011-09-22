@@ -217,8 +217,14 @@ hardware_subarch:	.long 0			# subarchitecture, added with 2.07
 
 hardware_subarch_data:	.quad 0
 
+#ifdef CONFIG_KERNEL_NONE
+# We do not have a compressed payload when using an uncompressed kernel.
+payload_offset:		.long 0
+payload_length:		.long 0
+#else
 payload_offset:		.long ZO_input_data
 payload_length:		.long ZO_z_input_len
+#endif
 
 setup_data:		.quad 0			# 64-bit physical pointer to
 						# single linked list of
