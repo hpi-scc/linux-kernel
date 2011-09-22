@@ -175,7 +175,6 @@ static int scc_freq_cpu_init(struct cpufreq_policy *policy) {
 	}
 
 	/* cpuinfo and default policy values */
-	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.transition_latency = 10000;
 	policy->cur = scc_freq_get_cpu_frequency(0);
 
