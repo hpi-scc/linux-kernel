@@ -151,12 +151,12 @@ static void __init scc_setup_boot_cpu_clockev(void)
  */
 static unsigned long __init scc_calibrate_tsc(void)
 {
-	unsigned long tsc_khz = CONFIG_SCC_BUSCLOCK / 1000;  // return clock frequency in kHz
+	unsigned long tsc_khz = CONFIG_SCC_BUSCLOCK / 1000;  // in kHz
 
 	printk(KERN_INFO "SCC: TSC calibration skipped. Returning pre-configured BUSCLOCK value of %lu.%03lu mHz.\n",
 		tsc_khz / 1000, tsc_khz % 1000);
 
-	return tsc_khz;	// return clock frequency in kHz
+	return tsc_khz;
 }
 
 /* SCC systems don't have an i8042 controller */
