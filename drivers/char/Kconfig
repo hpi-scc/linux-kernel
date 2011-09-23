@@ -14,6 +14,16 @@ config SCCSYS
 	  also responsible for initializing message-passing buffers and the
 	  MPBT (message-passing buffer type) caching type.
 
+config SCCSYS_FPGA_CLOCK
+	bool "Use global timestamp counter as clock source"
+	default y
+	depends on SCCSYS
+	---help---
+	  Register a clocksource backed by the global timestamp counter in the
+	  FPGA. The counter runs at a frequency of 125MHz and is independent of
+	  changes to the core and mesh frequencies, thus providing a reliable
+	  walltime to the core.
+
 config SCCSYS_RECURSIVE_PID_LOCK
 	bool "Recursive PID locks"
 	default y

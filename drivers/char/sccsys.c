@@ -10,6 +10,7 @@
 #  include <linux/modversions.h>
 #endif
 #include <linux/spinlock.h>
+#include <linux/clocksource.h>
 #include <asm/io.h>
 
 #include <linux/sccsys.h>
@@ -58,6 +59,42 @@ struct sccsys {
 static struct sccsys		sccsys_buffer;
 static struct sccsys*		sccsys = &sccsys_buffer;
 
+
+#ifdef CONFIG_SCCSYS_FPGA_CLOCK
+/* clocksource */
+static struct clocksource clocksource_scc;
+
+static cycle_t sccsys_read_clock(struct clocksource *cs)
+{
+	unsigned long lo, hi;
+
+	/* Read global timestamp counter from GRB address space. We read the two
+	 * halves separately, then check whether the high word has changed in
+	 * between: if it has, the low word has overflowed, so we retry the
+	 * operation. Otherwise, we are guaranteed to get a consistent pair of
+	 * low and high word, and can construct a cycle_t from it. */
+	do {
+		hi = sccsys_read_grb_entry(0x8228);
+		lo = sccsys_read_grb_entry(0x8224);
+	} while (hi != sccsys_read_grb_entry(0x8228));
+
+	return (cycle_t)(((unsigned long long)hi << 32) | lo);
+}
+
+static void sccsys_resume_clock(struct clocksource *cs)
+{
+	clocksource_scc.cycle_last = 0;
+}
+
+static struct clocksource clocksource_scc = {
+	.name                   = "scc",
+	.rating                 = 500,
+	.read                   = sccsys_read_clock,
+	.resume			= sccsys_resume_clock,
+	.mask                   = CLOCKSOURCE_MASK(64),
+	.flags                  = CLOCK_SOURCE_IS_CONTINUOUS,
+};
+#endif
 
 /* cleanup */
 static void sccsys_cleanup(void) {
@@ -172,7 +209,12 @@ static int __init sccsys_init(void) {
 	set_in_cr4(X86_CR4_MPE);
 	//__supported_pte_mask |= _PAGE_PMB;
 	printk(KERN_INFO "sccsys_init: GaussLake extensions enabled.\n");
-	
+
+#ifdef CONFIG_SCCSYS_FPGA_CLOCK
+	/* Register SCC clocksource */
+	clocksource_register_khz(&clocksource_scc, 125000);
+#endif
+
 	return 0;
 }
 
