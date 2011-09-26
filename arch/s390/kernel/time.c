@@ -207,7 +207,7 @@ static struct clocksource clocksource_tod = {
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 };
 
-struct clocksource * __init clocksource_default_clock(void)
+struct clocksource * clocksource_default_clock(void)
 {
 	return &clocksource_tod;
 }
