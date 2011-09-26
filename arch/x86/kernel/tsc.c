@@ -669,6 +669,9 @@ void restore_sched_clock_state(void)
 }
 
 #ifdef CONFIG_CPU_FREQ
+#ifdef CONFIG_X86_SCC
+static struct clocksource clocksource_tsc;
+#endif
 
 /* Frequency scaling support. Adjust the TSC based timer when the cpu frequency
  * changes.
@@ -716,6 +719,20 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 	}
 
 	set_cyc2ns_scale(tsc_khz, freq->cpu);
+
+#ifdef CONFIG_X86_SCC
+	/* Update the clocksource with the new TSC frequency. */
+	__clocksource_updatefreq_khz(&clocksource_tsc, tsc_khz);
+
+	/* If the clock source is currently being used, simply updating its
+	 * frequency will not make the timekeeper honor the new values. Instead,
+	 * we need to switch to another time source (which can be anything),
+	 * then switch back to the TSC. */
+	if (timekeeping_get_clock() == &clocksource_tsc) {
+		timekeeping_notify(clocksource_default_clock());
+		timekeeping_notify(&clocksource_tsc);
+	}
+#endif
 
 	return 0;
 }
