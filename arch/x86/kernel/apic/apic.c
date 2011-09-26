@@ -748,6 +748,8 @@ static int __init calibrate_APIC_clock(void)
 			return -1;
 	}
 #else // CONFIG_X86_SCC
+	long delta;
+
 	/*
 	 * No calibration possible since it is based on another clock we don't
 	 * have. On the SCC, the LAPIC timer *is* the primary clock source, so
@@ -758,6 +760,22 @@ static int __init calibrate_APIC_clock(void)
 	calibration_result = CONFIG_SCC_BUSCLOCK / HZ;
 	printk("SCC: Setting APIC timer based on configured Bus clock of %u.%04u MHz.\n",
 		calibration_result/(1000000/HZ), calibration_result%(1000000/HZ));
+
+	/* Calculate the scaled math multiplication factor. In the regular path,
+	 * this is done by first getting the delta value based on the hardware
+	 * reference clock, then calculating calibration_result. As we specify
+	 * calibration_result directly, we go the other way around and calculate
+	 * delta now, as it is used to set the lapic_clockevent parameters. */
+	delta = calibration_result * LAPIC_CAL_LOOPS / APIC_DIVISOR;
+
+	/* We have a delta value, so this code can simply be copied from the
+	 * above calibration routine. */
+	lapic_clockevent.mult = div_sc(delta, TICK_NSEC * LAPIC_CAL_LOOPS,
+				       lapic_clockevent.shift);
+	lapic_clockevent.max_delta_ns =
+		clockevent_delta2ns(0x7FFFFFFF, &lapic_clockevent);
+	lapic_clockevent.min_delta_ns =
+		clockevent_delta2ns(0xF, &lapic_clockevent);
 #endif
 	return 0;
 }
