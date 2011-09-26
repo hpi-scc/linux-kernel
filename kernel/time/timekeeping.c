@@ -460,6 +460,16 @@ void timekeeping_notify(struct clocksource *clock)
 }
 
 /**
+ * timekeeping_get_clock - Get clock source currently used by the timekeeper
+ *
+ * returns the pointer to the clock source
+ */
+struct clocksource* timekeeping_get_clock(void)
+{
+	return timekeeper.clock;
+}
+
+/**
  * ktime_get_real - get the real (wall-) time in ktime_t format
  *
  * returns the time in ktime_t format
