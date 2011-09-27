@@ -23,8 +23,11 @@
 #include <asm/e820.h>
 #include <asm/paravirt.h>
 
+#include <linux/sccsys.h>	/* for CRB/GRB definitions only */
+
 
 static int scc_subarch_enabled = 0;
+static unsigned long scc_boot_busclock = CONFIG_SCC_BUSCLOCK;
 
 /*
  * Here we do all the Local APIC initialization and stuff required to get the wormhole
@@ -102,17 +105,91 @@ void __init scc_setup_local_APIC_LINT(void)
 }
 
 /*
+ * Read a single unsigned int from a physical address. This routine maps the
+ * page of physical memory using a non-caching version of early_ioremap, so it
+ * should be called sparingly, and only until the full ioremap is available. */
+static unsigned int __init scc_early_readl_phys(unsigned int phys)
+{
+	unsigned int phys_page = phys & ~(PAGE_SIZE - 1);
+	unsigned int phys_offset = phys - phys_page;
+	unsigned int value;
+	void* base;
+
+	base = early_ioremap_nocache(phys_page, PAGE_SIZE);
+	value = readl(base + phys_offset);
+	early_iounmap(base, PAGE_SIZE);
+
+	return value;
+}
+
+/*
+ * Query tile clock. This code is an exact duplicate of the one from sccfreq,
+ * but we need to include it here because the driver is not initialized at this
+ * point, or may never be loaded at all.
+ */
+static unsigned int __cpuinit scc_early_query_tile_frequency(void)
+{
+	unsigned int fastclock = 0;
+	unsigned int divider = 0;
+	unsigned int freq = 0;
+
+	/* Get fastclock */
+	fastclock = scc_early_readl_phys(0xF9000000 + SCCGRB_CLKFREQ) & 0xFFFF;
+
+	/* Get core divider */
+	divider = scc_early_readl_phys(0xF8000000 + SCC_GCBCFG);
+	divider = (divider >> 8) & 0xF;
+	divider++;
+
+	/* Fallback to 533MHz */
+	if (!divider || !fastclock) {
+		freq = 533000;
+	} else {
+		/* Calculate new frequency */
+		freq = fastclock / divider * 1000;
+	}
+
+	/* return frequency */
+	return freq;
+}
+
+/*
  * SCC architecture initialization.
  */
 static void __cpuinit scc_arch_setup(void)
 {
-	if (boot_cpu_data.x86 == 5 && boot_cpu_data.x86_model == 2)
+	unsigned long real_busclock_khz;
+
+	if (boot_cpu_data.x86 == 5 && boot_cpu_data.x86_model == 2) {
 		printk(KERN_NOTICE "SCC: Intel GaussLake/P54C identified\n");
-	else
+
+		/* Read busclock from FPGA */
+		real_busclock_khz = scc_early_query_tile_frequency();
+
+		if (scc_boot_busclock == real_busclock_khz * 1000) {
+			printk(KERN_NOTICE "     Configured busclock of %lu.%03lu mHz matches detected busclock.\n",
+				scc_boot_busclock / 1000000,
+				(scc_boot_busclock / 1000) % 1000);
+		} else {
+			printk(KERN_NOTICE "     Overwriting configured busclock of %lu.%03lu mHz with detected busclock of %lu.%03lu mHz.\n",
+				scc_boot_busclock / 1000000,
+				(scc_boot_busclock / 1000) % 1000,
+				real_busclock_khz / 1000,
+				real_busclock_khz % 1000);
+			scc_boot_busclock = real_busclock_khz * 1000;
+		}
+	} else
 		printk(KERN_NOTICE "SCC: Unknown CPU (%d:%d)\n",
 			boot_cpu_data.x86,
 			boot_cpu_data.x86_model);
 }
+
+/* Get bus frequency at boot time. */
+unsigned long scc_get_boot_busclock(void)
+{
+	return scc_boot_busclock;
+}
+EXPORT_SYMBOL_GPL(scc_get_boot_busclock);
 
 /*
  * There is no legacy interrupt controller in the system, so there is also no
@@ -151,7 +228,7 @@ static void __init scc_setup_boot_cpu_clockev(void)
  */
 static unsigned long __init scc_calibrate_tsc(void)
 {
-	unsigned long tsc_khz = CONFIG_SCC_BUSCLOCK / 1000;  // in kHz
+	unsigned long tsc_khz = scc_boot_busclock / 1000; /* in kHz */
 
 	printk(KERN_INFO "SCC: TSC calibration skipped. Returning pre-configured BUSCLOCK value of %lu.%03lu mHz.\n",
 		tsc_khz / 1000, tsc_khz % 1000);

@@ -20,6 +20,9 @@
 #ifndef __LINUX_SCCSYS_H__
 #define __LINUX_SCCSYS_H__
 
+/* Query bus frequency at boot time. */
+extern unsigned long scc_get_boot_busclock(void);
+
 /* Check whether we are running on the lowest layer on SCC hardware */
 extern int scc_bare_metal(void);
 

@@ -53,6 +53,10 @@
 #include <asm/tsc.h>
 #include <asm/hypervisor.h>
 
+#ifdef CONFIG_X86_SCC
+#include <linux/sccsys.h>	/* scc_get_boot_busclock() */
+#endif
+
 unsigned int num_processors;
 
 unsigned disabled_cpus __cpuinitdata;
@@ -757,7 +761,7 @@ static int __init calibrate_APIC_clock(void)
 	 * bus clock.
          */
 
-	calibration_result = CONFIG_SCC_BUSCLOCK / HZ;
+	calibration_result = scc_get_boot_busclock() / HZ;
 	printk("SCC: Setting APIC timer based on configured Bus clock of %u.%04u MHz.\n",
 		calibration_result/(1000000/HZ), calibration_result%(1000000/HZ));
 
