@@ -55,6 +55,8 @@
 
 #ifdef CONFIG_X86_SCC
 #include <linux/sccsys.h>	/* scc_get_boot_busclock() */
+#include <linux/cpufreq.h>
+#include <linux/percpu.h>
 #endif
 
 unsigned int num_processors;
@@ -438,6 +440,16 @@ static int lapic_next_event(unsigned long delta,
 	return 0;
 }
 
+#ifdef CONFIG_X86_SCC
+static DEFINE_PER_CPU(enum clock_event_mode, last_APIC_timer_mode);
+static inline void __save_APIC_timer_setup(enum clock_event_mode mode)
+{
+	percpu_write(last_APIC_timer_mode, mode);
+}
+#else
+static inline void __save_APIC_timer_setup(enum clock_event_mode) {}
+#endif
+
 /*
  * Setup the lapic timer in periodic or oneshot mode
  */
@@ -452,6 +464,8 @@ static void lapic_timer_setup(enum clock_event_mode mode,
 		return;
 
 	local_irq_save(flags);
+
+	__save_APIC_timer_setup(mode);
 
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
@@ -518,6 +532,7 @@ static void __cpuinit setup_APIC_timer(void)
 	memcpy(levt, &lapic_clockevent, sizeof(*levt));
 	levt->cpumask = cpumask_of(smp_processor_id());
 
+	__save_APIC_timer_setup(CLOCK_EVT_MODE_UNUSED);
 	clockevents_register_device(levt);
 }
 
@@ -783,6 +798,80 @@ static int __init calibrate_APIC_clock(void)
 #endif
 	return 0;
 }
+
+#if defined(CONFIG_CPU_FREQ) && defined(CONFIG_X86_SCC)
+/* Update the specified APIC timer device to use a new frequency base.
+ * The routine must be invoked on the CPU the specified APIC timer device
+ * belongs to. */
+static inline void __updatefreq_APIC_timer(struct clock_event_device* evt)
+{
+	if (evt->features & CLOCK_EVT_FEAT_DUMMY) {
+		return;
+	}
+
+	/* Configure the APIC timer with the new calibration value. We simply
+	 * re-apply the last timer mode, which also sets the new clock divider.
+	 * The initial counter value in APIC_TMICT does not need to be updated,
+	 * as the counter frequency itself does not change. */
+	evt->set_mode(percpu_read(last_APIC_timer_mode), evt);
+}
+
+static unsigned int  ref_freq;
+static unsigned long calibration_ref;
+
+static int lapic_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
+				void *data)
+{
+	struct cpufreq_freqs *freq = data;
+	unsigned int new_calibration;
+
+	if (cpu_has(&cpu_data(freq->cpu), X86_FEATURE_CONSTANT_TSC))
+		return 0;
+
+	if (lapic_clockevent.features & CLOCK_EVT_FEAT_DUMMY)
+		return 0;
+
+	if (!ref_freq) {
+		ref_freq = freq->old;
+		calibration_ref = calibration_result;
+	}
+	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
+			(val == CPUFREQ_POSTCHANGE && freq->old > freq->new) ||
+			(val == CPUFREQ_RESUMECHANGE)) {
+		new_calibration = cpufreq_scale(calibration_ref, ref_freq, freq->new);
+	} else {
+		new_calibration = calibration_result;
+	}
+
+	if (new_calibration != calibration_result) {
+		struct clock_event_device *levt = &__get_cpu_var(lapic_events);
+
+		printk(KERN_INFO "LAPIC: reconfigure LAPIC timer. old=%x, new=%x\n", calibration_result, new_calibration);
+
+		calibration_result = new_calibration;
+		__updatefreq_APIC_timer(levt);
+	}
+
+	return 0;
+}
+
+static struct notifier_block lapic_cpufreq_notifier_block = {
+	.notifier_call  = lapic_cpufreq_notifier
+};
+
+static int __init cpufreq_lapic(void)
+{
+	if (!cpu_has_tsc)
+		return 0;
+	if (boot_cpu_has(X86_FEATURE_CONSTANT_TSC))
+		return 0;
+	cpufreq_register_notifier(&lapic_cpufreq_notifier_block,
+				CPUFREQ_TRANSITION_NOTIFIER);
+	return 0;
+}
+
+core_initcall(cpufreq_lapic);
+#endif
 
 /*
  * Setup the boot APIC
