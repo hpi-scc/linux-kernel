@@ -37,6 +37,7 @@
 #include <asm/io.h>             /* ioremap() & friends */
 #include <asm/pgtable.h>        /* page protection bits */
 #include <asm/apic.h>           /* apic_read() & apic_write() */
+#include <asm/lapic.h>          /* (un)set_lapic_mask */
 
 #include <linux/sccsys.h>
 
@@ -804,7 +805,6 @@ static int sccmb_poll(struct napi_struct* napi, int to_do)
     }
     /* Else perform a clean exit */
     else {
-      unsigned long v;
 
       /* If interrupts are disabled we hae to remain in the polling function,
        * i.e. we may signal that we are done with packet processing but must
@@ -818,8 +818,7 @@ static int sccmb_poll(struct napi_struct* napi, int to_do)
       napi_complete(&priv->napi);
 
       /* Do not use enable_irq(dev->irq); since we might loose enables --> INT locked up */      
-      v = apic_read(APIC_LVT0);
-      apic_write(APIC_LVT0, v & ~APIC_LVT_MASKED);
+      unset_lapic_mask(APIC_LVT0, dev->irq);
 
       /* The interrupt was cleared before the Rx packet was processed,
        * i.e. it will be re-set if another packet arrived since the last
@@ -847,8 +846,6 @@ static irqreturn_t sccmb_interrupt(int irq, void* dev_id)
 #ifdef SCCMB_NO_NAPI
   u8                          sourceIp = 0; 
   u8                          offset = 0; 
-#else
-  unsigned long               v;
 #endif
 
   /* Paranoid */
@@ -885,8 +882,7 @@ static irqreturn_t sccmb_interrupt(int irq, void* dev_id)
    * Do not use disable_irq_nosync(dev->irq); since we might loose enables --> INT locked up
    */
 
-  v = apic_read(APIC_LVT0);
-  apic_write(APIC_LVT0, v | APIC_LVT_MASKED);
+  set_lapic_mask(APIC_LVT0, dev->irq);
 
   napi_schedule(&priv->napi);
   return IRQ_HANDLED;

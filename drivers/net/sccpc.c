@@ -39,6 +39,7 @@
 #include <asm/io.h>             /* ioremap() & friends */
 #include <asm/pgtable.h>        /* page protection bits */
 #include <asm/apic.h>           /* apic_read() & apic_write() */
+#include <asm/lapic.h>          /* (un)set_lapic_mask */
 
 MODULE_AUTHOR("Werner Haas");
 MODULE_LICENSE("GPL");
@@ -456,9 +457,8 @@ static int sccpc_poll(struct napi_struct* napi, int to_do)
 
       /* Tell the system we are done with polling */
       napi_complete(napi);
-      
-      v = apic_read(SCCPC_LVT);
-      apic_write(SCCPC_LVT, v & ~APIC_LVT_MASKED);
+
+      unset_lapic_mask(SCCPC_LVT, dev->irq);
 
       /* The interrupt was cleared before the Rx packet was processed,
        * i.e. it will be re-set if another packet arrived since the last
@@ -495,8 +495,7 @@ static irqreturn_t sccpc_interrupt(int irq, void* dev_id)
 #endif
 
   /* Mask further interrupts and start the polling process */
-  v = apic_read(SCCPC_LVT);
-  apic_write(SCCPC_LVT, v | APIC_LVT_MASKED);
+  set_lapic_mask(SCCPC_LVT, dev->irq);
 
   napi_schedule(&priv->napi);
   

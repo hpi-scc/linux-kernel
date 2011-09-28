@@ -18,6 +18,7 @@
 
 #include <asm/setup.h>
 #include <asm/apic.h>
+#include <asm/lapic.h>
 #include <asm/io.h>
 #include <asm/i8259.h>
 #include <asm/e820.h>
@@ -53,16 +54,6 @@ struct sccirq_entry sccirqs[] = {
 #define LVT0_IRQ 4
 #define LVT1_IRQ 3
 
-void scc_mask_lapic_lvt(u32 reg)
-{
-	apic_write(reg, apic_read(reg) | APIC_LVT_MASKED);
-}
-
-void scc_unmask_lapic_lvt(u32 reg)
-{
-	apic_write(reg, apic_read(reg) & ~APIC_LVT_MASKED);
-}
-
 static struct sccirq_entry* sccirq_get_entry(int irq)
 {
 	if (irq >= SCCIRQ_FIRST_VECTOR && irq <= SCCIRQ_LAST_VECTOR) {
@@ -74,12 +65,12 @@ static struct sccirq_entry* sccirq_get_entry(int irq)
 
 static void sccirq_mask_lapic(struct irq_data *data)
 {
-	scc_mask_lapic_lvt(sccirq_get_entry(data->irq)->reg);
+	set_lapic_mask(sccirq_get_entry(data->irq)->reg, data->irq);
 }
 
 static void sccirq_unmask_lapic(struct irq_data *data)
 {
-	scc_unmask_lapic_lvt(sccirq_get_entry(data->irq)->reg);
+	unset_lapic_mask(sccirq_get_entry(data->irq)->reg, data->irq);
 }
 
 static void sccirq_ack_lapic(struct irq_data *data)
