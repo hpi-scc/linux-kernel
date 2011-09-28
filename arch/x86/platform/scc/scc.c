@@ -104,6 +104,7 @@ void __init scc_setup_local_APIC_LINT(void)
 	apic_write(APIC_LVT1, (IRQ0_VECTOR + LVT1_IRQ) | APIC_LVT_MASKED | (APIC_MODE_FIXED << 8));
 }
 
+#ifdef CONFIG_SCC_QUERY_FREQUENCY_FROM_FPGA
 /*
  * Read a single unsigned int from a physical address. This routine maps the
  * page of physical memory using a non-caching version of early_ioremap, so it
@@ -152,6 +153,7 @@ static unsigned int __init scc_early_query_tile_frequency(void)
 	/* return frequency */
 	return freq;
 }
+#endif // CONFIG_SCC_QUERY_FREQUENCY_FROM_FPGA
 
 /*
  * SCC architecture initialization.
@@ -163,6 +165,7 @@ static void __init scc_arch_setup(void)
 	if (boot_cpu_data.x86 == 5 && boot_cpu_data.x86_model == 2) {
 		printk(KERN_NOTICE "SCC: Intel GaussLake/P54C identified\n");
 
+#ifdef CONFIG_SCC_QUERY_FREQUENCY_FROM_FPGA
 		/* Read busclock from FPGA */
 		real_busclock_khz = scc_early_query_tile_frequency();
 
@@ -178,6 +181,7 @@ static void __init scc_arch_setup(void)
 				real_busclock_khz % 1000);
 			scc_boot_busclock = real_busclock_khz * 1000;
 		}
+#endif // CONFIG_SCC_QUERY_FREQUENCY_FROM_FPGA
 	} else
 		printk(KERN_NOTICE "SCC: Unknown CPU (%d:%d)\n",
 			boot_cpu_data.x86,

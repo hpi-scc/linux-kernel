@@ -412,7 +412,7 @@ config X86_MRST
 	  not contain i8259, i8254, HPET, legacy BIOS, most of the io ports.
 
 config X86_SCC
-	bool "Copperridge/RockyLake platform"
+	bool "Single-Chip Cloud Computer (SCC)"
 	 depends on X86_32
 	 depends on X86_EXTENDED_PLATFORM
 	---help---
@@ -425,7 +425,91 @@ config SCC_BUSCLOCK
 	range 1000000 2000000000
 	---help---
 	  SCC core clock frequency used to calculate configuration for LAPIC
-	  timer setup
+	  timer setup.
+
+config SCC_QUERY_FREQUENCY_FROM_FPGA
+	bool "Get real SCC FSB clock from FPGA"
+	default y
+	depends on X86_SCC
+	---help---
+	  Read the real SCC FSB clock frequency from the FPGA's global
+	  configuration register bank (GRB) during boot. If this option is
+	  enabled and a valid frequency is read, it overwrites the statically-
+	  configured value. If this option is disabled or the value read from
+	  the FPGA is obviously wrong (e.g., a FASTCLOCK of zero), the
+	  configured value is used instead.
+
+config X86_SCC_LAPIC_TRACK_CPU_FREQ
+	bool "LAPIC timer: Track CPU frequency changes"
+	default y
+	depends on X86_SCC
+	depends on X86_LOCAL_APIC
+	depends on CPU_FREQ
+	---help---
+	  Make the LAPIC timer track changes to the CPU core frequency via the
+	  sccfreq driver.
+
+	  If this option is enabled, the clock divisor used by the LAPIC timer
+	  is adjusted automatically whenever the core frequency is changed, thus
+	  allowing the frequency of the LAPIC timer interrupts to stay the same.
+	  This setting allows the "jiffies" clock source to report correct
+	  (real) time.
+
+	  If this option is disabled, the clock divisor is set once during boot,
+	  based on the detected or statically-configured bus frequency.
+	  This setting results in the "jiffies" clock source reporting time
+	  relative to the ratio of the current and boot frequency.
+
+config X86_SCC_TSC_TRACK_CPU_FREQ
+	bool "TSC: Track CPU frequency changes"
+	default y
+	depends on X86_SCC
+	depends on CPU_FREQ
+	---help---
+	  Make the TSC clock source track changes to the CPU core frequency via
+	  the sccfreq driver.
+
+	  If this option is enabled, the frequency of the TSC clock source is
+	  adjusted automatically whenever the core frequency is changed.
+	  This setting allows the "tsc" clock source to report correct (real)
+	  time.
+
+	  If this option is disabled, the frequency of the TSC clock source is
+	  set once during boot, based on the detected or statically-configured
+	  bus frequency. This results in the "tsc" clock source reporting time
+	  relative to the ratio of the current and boot frequency.
+
+config SCCSYS
+	bool "SCC System Driver"
+	depends on X86_SCC
+	default y
+	---help---
+	  SCC system driver. This driver provides access to the
+	  architecture-specific configuration register banks (CRB) of the tile,
+	  and the global configuration register bank (GRB) of the FPGA, and is
+	  also responsible for initializing message-passing buffers and the
+	  MPBT (message-passing buffer type) caching type.
+	  This driver is a prerequisite for using other SCC-specific drivers
+	  like RCKMEM (the SCC memory driver providing devices like /dev/rckncm)
+	  or RCKMB, RCKPC or RCKEMAC (the network drivers for on-die and off-die
+	  communication).
+
+config SCCSYS_FPGA_CLOCK
+	bool "Use global timestamp counter as clock source"
+	default y
+	depends on SCCSYS
+	---help---
+	  Register a clocksource backed by the global timestamp counter in the
+	  FPGA. The counter runs at a frequency of 125MHz and is independent of
+	  changes to the core and mesh frequencies, thus providing a reliable
+	  walltime to the core.
+
+config SCCSYS_RECURSIVE_PID_LOCK
+	bool "Recursive PID locks"
+	default y
+	depends on SCCSYS
+	---help---
+	  Allow acquiring the core-specific test&set registers recursively.
 
 config X86_RDC321X
 	bool "RDC R-321x SoC"

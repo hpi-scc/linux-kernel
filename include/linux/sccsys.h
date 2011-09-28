@@ -285,6 +285,27 @@ static inline int scc_pid_to_tileid(scc_pid_t pid)
 	return scc_coord_to_tileid(scc_pid_to_coord(pid));
 }
 
+/*
+ * Global Clock Unit (GCU) Configuration Register
+ */
+typedef union scc_gckcfg {
+	struct {
+		unsigned long RESC0 : 1;
+		unsigned long RESC1 : 1;
+		unsigned long RESL20 : 1;
+		unsigned long RESL21 : 1;
+		unsigned long SREC0 : 1;
+		unsigned long SREC1 : 1;
+		unsigned long SREL21 : 1;
+		unsigned long SREL20 : 1;
+		unsigned long divider : 4;
+		unsigned long ratio : 7;
+		unsigned long router : 7;
+		unsigned long reserved : 6;
+	};
+	unsigned long raw;
+} scc_gckcfg_t;
+
 /* Get value of own tileid. The format is 0...0_00000yyy_yxxxxzzz (in bits).
  * Tile IDs are not consecutive; if a consecutive number is needed, consider
  * using the PID instead.
@@ -343,10 +364,22 @@ extern scc_lut_t sccsys_read_lut_entry(scc_pid_t pid, unsigned int index);
 /* Write LUT entry */
 extern int sccsys_write_lut_entry(scc_pid_t pid, unsigned int index, scc_lut_t lut);
 
+/* Read Global Clock Unit (GCU) configuration register */
+extern scc_gckcfg_t sccsys_read_gcbcfg(scc_pid_t pid);
+
+/* Write Global Clock Unit (GCU) configuration register */
+extern int sccsys_write_gcbcfg(scc_pid_t pid, scc_gckcfg_t cfg);
+
 /* Get address of mapped global configuration register bank */
 extern void* sccsys_get_grb(void);
 
 /* Read global configuration register */
 extern unsigned sccsys_read_grb_entry(unsigned int offset);
+
+/* Write global configuration register */
+extern void sccsys_write_grb_entry(unsigned int offset, unsigned value);
+
+/* Read frequency of the fast clock from the global configuration register bank */
+extern unsigned short sccsys_read_grb_fastclock(void);
 
 #endif /* __LINUX_SCCSYS_H__ */

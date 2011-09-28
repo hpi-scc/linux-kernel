@@ -440,15 +440,15 @@ static int lapic_next_event(unsigned long delta,
 	return 0;
 }
 
-#ifdef CONFIG_X86_SCC
+#ifdef CONFIG_X86_SCC_LAPIC_TRACK_CPU_FREQ
 static DEFINE_PER_CPU(enum clock_event_mode, last_APIC_timer_mode);
 static inline void __save_APIC_timer_setup(enum clock_event_mode mode)
 {
 	percpu_write(last_APIC_timer_mode, mode);
 }
-#else
+#else // CONFIG_X86_SCC_LAPIC_TRACK_CPU_FREQ
 static inline void __save_APIC_timer_setup(enum clock_event_mode) {}
-#endif
+#endif // !CONFIG_X86_SCC_LAPIC_TRACK_CPU_FREQ
 
 /*
  * Setup the lapic timer in periodic or oneshot mode
@@ -795,11 +795,11 @@ static int __init calibrate_APIC_clock(void)
 		clockevent_delta2ns(0x7FFFFFFF, &lapic_clockevent);
 	lapic_clockevent.min_delta_ns =
 		clockevent_delta2ns(0xF, &lapic_clockevent);
-#endif
+#endif // CONFIG_X86_SCC
 	return 0;
 }
 
-#if defined(CONFIG_CPU_FREQ) && defined(CONFIG_X86_SCC)
+#if defined(CONFIG_CPU_FREQ) && defined(CONFIG_X86_SCC_LAPIC_TRACK_CPU_FREQ)
 /* Update the specified APIC timer device to use a new frequency base.
  * The routine must be invoked on the CPU the specified APIC timer device
  * belongs to. */
@@ -869,7 +869,7 @@ static int __init cpufreq_lapic(void)
 }
 
 core_initcall(cpufreq_lapic);
-#endif
+#endif // CONFIG_CPU_FREQ && CONFIG_X86_SCC_LAPIC_TRACK_CPU_FREQ
 
 /*
  * Setup the boot APIC

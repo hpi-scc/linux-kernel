@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/scc/sccsys.c
+ *  linux/arch/x86/kernel/cpu/sccsys.c
  *
  *  SCC system driver, partially based on the original sccmem.c driver
  *  distributed as part of SCC Linux.
@@ -16,7 +16,7 @@
 #include <linux/sccsys.h>
 
 /* DEBUG messages */
-#define DEBUG_MSG 1
+#define DEBUG_MSG 0
 #define PRINTD(format, args...) if (DEBUG_MSG) { printk(format, ##args); }
 
 /* Symbols */
@@ -572,6 +572,38 @@ int sccsys_write_lut_entry(scc_pid_t pid, unsigned int index, scc_lut_t lut)
 }
 EXPORT_SYMBOL(sccsys_write_lut_entry);
 
+/* Read Global Clock Unit (GCU) configuration register */
+scc_gckcfg_t sccsys_read_gcbcfg(scc_pid_t pid)
+{
+	void* address;
+	scc_gckcfg_t value;
+
+	address = sccsys_get_crb_entry_for_tile_of_pid(pid, SCC_GCBCFG);
+	if (!address) {
+		value.raw = 0;
+	} else {
+		value.raw = readl(address);
+	}
+
+	return value;
+}
+EXPORT_SYMBOL(sccsys_read_gcbcfg);
+
+/* Write Global Clock Unit (GCU) configuration register */
+int sccsys_write_gcbcfg(scc_pid_t pid, scc_gckcfg_t cfg)
+{
+	void* address;
+
+	address = sccsys_get_crb_entry_for_tile_of_pid(pid, SCC_GCBCFG);
+	if (!address) {
+		return 0;
+	}
+
+	writel(cfg.raw, address);
+	return 1;
+}
+EXPORT_SYMBOL(sccsys_write_gcbcfg);
+
 /* Get address of mapped global configuration register bank */
 void* sccsys_get_grb(void)
 {
@@ -585,6 +617,13 @@ unsigned sccsys_read_grb_entry(unsigned int offset)
 	return readl(sccsys->grb + offset);
 }
 EXPORT_SYMBOL(sccsys_read_grb_entry);
+
+/* Write global configuration register */
+void sccsys_write_grb_entry(unsigned int offset, unsigned value)
+{
+	writel(value, sccsys->grb + offset);
+}
+EXPORT_SYMBOL(sccsys_write_grb_entry);
 
 /* Convert a node-local physical address into a system address */
 scc_addr_t sccsys_physical_to_system(scc_pid_t pid, unsigned long pa)
@@ -603,6 +642,13 @@ scc_addr_t sccsys_physical_to_system(scc_pid_t pid, unsigned long pa)
 	return sccaddr;
 }
 EXPORT_SYMBOL(sccsys_physical_to_system);
+
+/* Read frequency of the fast clock from the global configuration register bank */
+unsigned short sccsys_read_grb_fastclock(void)
+{
+	return (unsigned short)(sccsys_read_grb_entry(SCCGRB_CLKFREQ) & 0xFFFF);
+}
+EXPORT_SYMBOL(sccsys_read_grb_fastclock);
 
 module_init(sccsys_init);
 module_exit(sccsys_exit);

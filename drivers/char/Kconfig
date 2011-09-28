@@ -4,33 +4,6 @@
 
 menu "Character devices"
 
-config SCCSYS
-	bool "SCC system driver"
-	depends on X86_SCC
-	default n
-	---help---
-	  SCC system driver. This driver provides access to the
-	  architecture-specific configuration register banks (CRB), and is
-	  also responsible for initializing message-passing buffers and the
-	  MPBT (message-passing buffer type) caching type.
-
-config SCCSYS_FPGA_CLOCK
-	bool "Use global timestamp counter as clock source"
-	default y
-	depends on SCCSYS
-	---help---
-	  Register a clocksource backed by the global timestamp counter in the
-	  FPGA. The counter runs at a frequency of 125MHz and is independent of
-	  changes to the core and mesh frequencies, thus providing a reliable
-	  walltime to the core.
-
-config SCCSYS_RECURSIVE_PID_LOCK
-	bool "Recursive PID locks"
-	default y
-	depends on SCCSYS
-	---help---
-	  Allow acquiring the core-specific test&set registers recursively.
-
 config SCCMEM
 	bool "SCC system memory driver"
 	default n

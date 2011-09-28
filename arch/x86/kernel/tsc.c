@@ -669,7 +669,7 @@ void restore_sched_clock_state(void)
 }
 
 #ifdef CONFIG_CPU_FREQ
-#ifdef CONFIG_X86_SCC
+#ifdef CONFIG_X86_SCC_TSC_TRACK_CPU_FREQ
 static struct clocksource clocksource_tsc;
 #endif
 
@@ -720,7 +720,7 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 
 	set_cyc2ns_scale(tsc_khz, freq->cpu);
 
-#ifdef CONFIG_X86_SCC
+#ifdef CONFIG_X86_SCC_TSC_TRACK_CPU_FREQ
 	/* Update the clocksource with the new TSC frequency. */
 	__clocksource_updatefreq_khz(&clocksource_tsc, tsc_khz);
 
@@ -732,7 +732,7 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 		timekeeping_notify(clocksource_default_clock());
 		timekeeping_notify(&clocksource_tsc);
 	}
-#endif
+#endif // CONFIG_X86_SCC_TSC_TRACK_CPU_FREQ
 
 	return 0;
 }

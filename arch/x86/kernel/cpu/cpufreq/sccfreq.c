@@ -31,21 +31,11 @@
 #include <linux/init.h>
 
 #include <linux/cpufreq.h>
+#include <linux/sccsys.h>
 
 #include <asm/io.h>
 
-#define GRB_OFFSET	0xF9000000
-#define CRB_OFFSET	0xF8000000
-
-#define FASTCLOCK	0x8230
-#define GCBCFG		0x80
-
-#define MODVERSION	"0.2"
-
-/** mapped grb */
-static void *grb = NULL;
-/** mapped crb */
-static void *crb = NULL;
+#define MODVERSION	"0.2b"
 
 /** Frequency mapping table */
 static struct cpufreq_frequency_table scc_freq_table[] = {
@@ -65,11 +55,10 @@ static unsigned int scc_freq_get_cpu_frequency(unsigned int cpu) {
 	unsigned int freq = 0;
 
 	/* Get fastclock */
-	fastclock = readl(grb + FASTCLOCK) & 0xFFFF;
+	fastclock = sccsys_read_grb_fastclock();
 
 	/* Get core divider */
-	divider = readl(crb + GCBCFG);
-	divider = (divider >> 8) & 0xF;
+	divider = sccsys_read_gcbcfg(sccsys_get_pid()).divider;
 	divider++;
 
 	/* Fallback to 533MHz */
@@ -90,11 +79,8 @@ static unsigned int scc_freq_get_cpu_frequency(unsigned int cpu) {
  */
 static void scc_freq_set_cpu_state(unsigned int state) {
 	struct cpufreq_freqs freqs;
-	unsigned int gcbcfg;
+	scc_gckcfg_t gcbcfg;
 	unsigned int divider;
-	unsigned int ratio;
-	unsigned int low;
-	unsigned int router;
 
 	/* Save old data and setup new values */
 	freqs.old = scc_freq_get_cpu_frequency(0);
@@ -109,11 +95,7 @@ static void scc_freq_set_cpu_state(unsigned int state) {
 	local_irq_disable();
 
 	/* Calculate new gcbcfg value and set it */
-	gcbcfg = readl(crb + GCBCFG);
-	divider = (gcbcfg >> 8) & 0xF;
-
-	ratio = (gcbcfg >> 12) & 0x7F;
-	router = (gcbcfg >> 19) & 0x7F;
+	gcbcfg = sccsys_read_gcbcfg(sccsys_get_pid());
 
 	if (state == 0x01) {
 		divider = 1;
@@ -121,11 +103,10 @@ static void scc_freq_set_cpu_state(unsigned int state) {
 		divider = 2;
 	}
 
-	low = gcbcfg & 0xFF;
+	gcbcfg.divider = divider;
+	gcbcfg.router = 7 * (divider + 1);
 
-	gcbcfg = ((7 * (divider + 1)) << 19) | (ratio << 12) | (divider << 8) | low;
-
-	writel(gcbcfg, crb + GCBCFG);
+	sccsys_write_gcbcfg(sccsys_get_pid(), gcbcfg);
 
 	local_irq_enable();
 
@@ -227,19 +208,6 @@ static int __init scc_freq_init(void) {
 		return -EINVAL;
 	}
 
-	grb = ioremap_nocache(GRB_OFFSET, 0x10000);
-	if (!grb) {
-		printk(KERN_ERR "scc_freq_init: error: failed to remap grb memory\n");
-		return -ENOMEM;
-	}
-
-	crb = ioremap_nocache(CRB_OFFSET, 0x10000);
-	if (!crb) {
-		printk(KERN_ERR "scc_freq_init: error: failed to remap crb memory\n");
-		iounmap(grb);
-		return -ENOMEM;
-	}
-
 	return cpufreq_register_driver(&scc_freq_driver);
 }
 
@@ -248,8 +216,6 @@ static int __init scc_freq_init(void) {
  */
 static void __exit scc_freq_exit(void) {
 	cpufreq_unregister_driver(&scc_freq_driver);
-	iounmap(grb);
-	iounmap(crb);
 }
 
 module_init(scc_freq_init);

@@ -2,7 +2,6 @@
 # Makefile for the kernel character device drivers.
 #
 
-obj-$(CONFIG_SCCSYS)		+= sccsys.o
 obj-$(CONFIG_SCCMEM)		+= sccmem.o
 obj-$(CONFIG_SCCPERF)		+= sccperf.o
 obj-y				+= sccproc/
