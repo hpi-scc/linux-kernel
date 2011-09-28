@@ -83,6 +83,9 @@ MODULE_PARM_DESC(override, "Override sccKit configuration");
 
 static int core0 = 0;
 
+/* grb address */
+static void* grb;
+
 /**
  * \brief Read long from emac
  * \param pAddr address we want to read
@@ -944,6 +947,8 @@ static int __init emac_module_init(void) {
 	int tmp;
 
 	printk(KERN_DEBUG "eMAC driver %s\n", MODVERSTRING);
+
+	grb = sccsys_get_grb();
 
 	/* Get SCC processor id */
 	core0 = sccsys_get_pid();

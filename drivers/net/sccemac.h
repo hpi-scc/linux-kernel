@@ -93,7 +93,7 @@
 #define BUFFER_SIZE								(BUFFER_NUM * PAGE_SIZE)
 
 /* Mapping */
-#define RA(_x, _y)								(sccsys_get_grb() + (_x) + (_y) * 4)
+#define RA(_x, _y)								(grb + (_x) + (_y) * 4)
 
 /* Interrupt configuration */
 #ifdef USE_LVT0
