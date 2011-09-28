@@ -127,7 +127,7 @@ static unsigned int __init scc_early_readl_phys(unsigned int phys)
  * but we need to include it here because the driver is not initialized at this
  * point, or may never be loaded at all.
  */
-static unsigned int __cpuinit scc_early_query_tile_frequency(void)
+static unsigned int __init scc_early_query_tile_frequency(void)
 {
 	unsigned int fastclock = 0;
 	unsigned int divider = 0;
@@ -156,7 +156,7 @@ static unsigned int __cpuinit scc_early_query_tile_frequency(void)
 /*
  * SCC architecture initialization.
  */
-static void __cpuinit scc_arch_setup(void)
+static void __init scc_arch_setup(void)
 {
 	unsigned long real_busclock_khz;
 
