@@ -846,8 +846,6 @@ static int lapic_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 	if (new_calibration != calibration_result) {
 		struct clock_event_device *levt = &__get_cpu_var(lapic_events);
 
-		printk(KERN_INFO "LAPIC: reconfigure LAPIC timer. old=%x, new=%x\n", calibration_result, new_calibration);
-
 		calibration_result = new_calibration;
 		__updatefreq_APIC_timer(levt);
 	}
