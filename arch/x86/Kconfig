@@ -490,8 +490,8 @@ config SCCSYS
 	  also responsible for initializing message-passing buffers and the
 	  MPBT (message-passing buffer type) caching type.
 	  This driver is a prerequisite for using other SCC-specific drivers
-	  like RCKMEM (the SCC memory driver providing devices like /dev/rckncm)
-	  or RCKMB, RCKPC or RCKEMAC (the network drivers for on-die and off-die
+	  like SCCMEM (the SCC memory driver providing devices like /dev/rckncm)
+	  or SCCMB, SCCPC or SCCEMAC (the network drivers for on-die and off-die
 	  communication).
 
 config SCCSYS_FPGA_CLOCK
