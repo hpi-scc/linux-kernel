@@ -38,9 +38,23 @@
 #define MODVERSION	"0.2b"
 
 /** Frequency mapping table */
+/* The index member encodes the tile clock divisor for GCBCFG */
 static struct cpufreq_frequency_table scc_freq_table[] = {
-	{0x01, 533000},
-	{0x02, 800000},
+	{0x01, 800000},
+	{0x02, 533000},
+	{0x03, 400000},
+	{0x04, 320000},
+	{0x05, 266000},
+	{0x06, 228000},
+	{0x07, 200000},
+	{0x08, 178000},
+	{0x09, 160000},
+	{0x0A, 145000},
+	{0x0B, 133000},
+	{0x0C, 123000},
+	{0x0D, 114000},
+	{0x0E, 106000},
+	{0x0F, 100000},
 	{0, CPUFREQ_TABLE_END},
 };
 
@@ -97,9 +111,12 @@ static void scc_freq_set_cpu_state(unsigned int state) {
 	/* Calculate new gcbcfg value and set it */
 	gcbcfg = sccsys_read_gcbcfg(sccsys_get_pid());
 
-	if (state == 0x01) {
-		divider = 1;
-	} else {
+	/* Get new divider value from frequency table. If it is out of range
+	 * OR indicates a tile clock of 1600MHz, we force it down to 800MHz,
+	 * although that should never happen unless we have serious memory
+	 * corruption. */
+	divider = (unsigned int)scc_freq_table[state].index;
+	if (!divider || divider > 15) {
 		divider = 2;
 	}
 
