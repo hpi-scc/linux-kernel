@@ -998,6 +998,7 @@ out_err:
 }
 EXPORT_SYMBOL(set_memory_uc);
 
+#ifdef CONFIG_X86_SCC
 int set_memory_mpbt(unsigned long start, int numpages)
 {
 	unsigned int i, level;
@@ -1020,7 +1021,6 @@ int set_memory_mpbt(unsigned long start, int numpages)
 }
 EXPORT_SYMBOL(set_memory_mpbt);
 
-#ifdef CONFIG_X86_SCC
 int set_memory_wt_mpbt(unsigned long addr, int numpages)
 {
 	return change_page_attr_set(&addr, numpages,
@@ -1203,6 +1203,7 @@ int set_pages_uc(struct page *page, int numpages)
 }
 EXPORT_SYMBOL(set_pages_uc);
 
+#ifdef CONFIG_X86_SCC
 int set_pages_mpbt(struct page *page, int numpages)
 {
 	unsigned long addr = (unsigned long)page_address(page);
@@ -1210,6 +1211,15 @@ int set_pages_mpbt(struct page *page, int numpages)
 	return set_memory_mpbt(addr, numpages);
 }
 EXPORT_SYMBOL(set_pages_mpbt);
+
+int set_pages_wt_mpbt(struct page *page, int numpages)
+{
+	unsigned long addr = (unsigned long)page_address(page);
+
+	return set_memory_wt_mpbt(addr, numpages);
+}
+EXPORT_SYMBOL(set_pages_wt_mpbt);
+#endif
 
 static int _set_pages_array(struct page **pages, int addrinarray,
 		unsigned long new_type)
