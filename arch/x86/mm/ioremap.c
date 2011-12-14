@@ -256,12 +256,14 @@ void __iomem *ioremap_prot(resource_size_t phys_addr, unsigned long size,
 }
 EXPORT_SYMBOL(ioremap_prot);
 
+#ifdef CONFIG_X86_SCC
 void __iomem *ioremap_mpbt(resource_size_t phys_addr, unsigned long size)
 {
 	return __ioremap_caller(phys_addr, size, _PAGE_PSE | _PAGE_CACHE_WC,
 				__builtin_return_address(0));
 }
 EXPORT_SYMBOL(ioremap_mpbt);
+#endif
 
 /**
  * iounmap - Free a IO remapping
